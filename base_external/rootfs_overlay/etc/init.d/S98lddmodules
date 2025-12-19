@@ -1,0 +1,74 @@
+#!/bin/sh
+
+echo "S98lddmodules start running" > /dev/kmsg
+
+KMOD_DIR="/lib/modules/$(uname -r)/extra"
+
+case "$1" in
+    start)
+        echo "Starting LDD modules..." > /dev/kmsg
+
+        # Ensure module dependency files exist (helps modprobe)
+        if command -v depmod >/dev/null 2>&1; then
+            depmod -a
+        fi
+
+        # 1) scull (loads module + creates /dev nodes)
+        if [ -x /usr/bin/scull_load ]; then
+            cd "$KMOD_DIR" && /usr/bin/scull_load scull
+        else
+            echo "ERROR: /usr/bin/scull_load not found" > /dev/kmsg
+        fi
+
+        # 2) faulty (from misc-modules)
+        if [ -x /usr/bin/module_load ]; then
+            cd "$KMOD_DIR" && /usr/bin/module_load faulty
+        else
+            echo "ERROR: /usr/bin/module_load not found" > /dev/kmsg
+        fi
+
+        # 3) hello via modprobe
+        if command -v modprobe >/dev/null 2>&1; then
+            modprobe hello || echo "WARNING: modprobe hello failed" > /dev/kmsg
+        else
+            echo "ERROR: modprobe not available (enable kmod in Buildroot)" > /dev/kmsg
+        fi
+        ;;
+
+    stop)
+        echo "Stopping LDD modules..."
+
+        # Unload in reverse order
+
+        # hello
+        if command -v rmmod >/dev/null 2>&1; then
+            rmmod hello 2>/dev/null || true
+        fi
+
+        # faulty
+        if [ -x /usr/bin/module_unload ]; then
+            /usr/bin/module_unload faulty
+        else
+            echo "WARNING: /usr/bin/module_unload not found" > /dev/kmsg
+        fi
+
+        # scull (removes /dev nodes + unloads module)
+        if [ -x /usr/bin/scull_unload ]; then
+            /usr/bin/scull_unload scull
+        else
+            echo "WARNING: /usr/bin/scull_unload not found" > /dev/kmsg
+        fi
+        ;;
+
+    restart)
+        $0 stop
+        $0 start
+        ;;
+
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac
+
+exit 0
