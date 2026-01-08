@@ -1,0 +1,6 @@
+
+config BR2_PACKAGE_AESDCHAR
+	bool "aesdchar"
+	help
+	  Linux AESD Char Driver.
+	  Builds and installs aesdchar kernel module.
